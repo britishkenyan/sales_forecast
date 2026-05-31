@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+{% block title %}Forecast{% endblock %}
+{% block page_title %}Sales Forecast{% endblock %}
+{% block page_subtitle %}Predictive models for future sales performance{% endblock %}
+
+{% block content %}
+<!-- Forecast Controls -->
+<div class="glass rounded-2xl p-4 sm:p-6 mb-8">
+    <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-4">
+        <div>
+            <h3 class="text-lg font-semibold text-white mb-1">Configure Forecast</h3>
+            <p class="text-sm text-slate-400">Adjust parameters and run predictions</p>
+        </div>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">Forecast Period</label>
+                <select id="forecastMonths" class="w-full sm:w-auto bg-slate-800/80 border border-slate-600/50 text-white rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                    <option value="3">3 Months</option>
+                    <option value="6" selected>6 Months</option>
+                    <option value="9">9 Months</option>
+                    <option value="12">12 Months</option>
+                    <option value="18">18 Months</option>
+                    <option value="24">24 Months</option>
+                </select>
+            </div>
+            <button onclick="runForecast()" class="sm:mt-5 px-6 py-2.5 bg-gradient-to-r from-brand-600 to-brand-500 text-white font-medium rounded-xl hover:from-brand-500 hover:to-brand-400 transition-all shadow-lg shadow-brand-500/25 text-sm">
+                Run Forecast
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Model Performance Cards -->
+<div id="modelCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
+    <div class="glass rounded-2xl p-6 animate-pulse">
+        <div class="h-4 bg-slate-700 rounded w-2/3 mb-4"></div>
+        <div class="h-8 bg-slate-700 rounded w-1/2 mb-2"></div>
+        <div class="h-3 bg-slate-700 rounded w-full"></div>
+    </div>
+    <div class="glass rounded-2xl p-6 animate-pulse">
+        <div class="h-4 bg-slate-700 rounded w-2/3 mb-4"></div>
+        <div class="h-8 bg-slate-700 rounded w-1/2 mb-2"></div>
+        <div class="h-3 bg-slate-700 rounded w-full"></div>
+    </div>
+    <div class="glass rounded-2xl p-6 animate-pulse">
+        <div class="h-4 bg-slate-700 rounded w-2/3 mb-4"></div>
+        <div class="h-8 bg-slate-700 rounded w-1/2 mb-2"></div>
+        <div class="h-3 bg-slate-700 rounded w-full"></div>
+    </div>
+</div>
+
+<!-- Main Forecast Chart -->
+<div class="glass rounded-2xl p-4 sm:p-6 mb-8 card-hover">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+            <h3 class="text-lg font-semibold text-white">Forecast Visualization</h3>
+            <p class="text-sm text-slate-400">Historical data with predicted future trends</p>
+        </div>
+        <div id="modelSelector" class="flex gap-2 overflow-x-auto pb-1"></div>
+    </div>
+    <div class="h-64 sm:h-80 lg:h-96">
+        <canvas id="forecastChart"></canvas>
+    </div>
+</div>
+
+<!-- Metrics Comparison -->
+<div class="glass rounded-2xl p-4 sm:p-6 card-hover">
+    <div class="mb-6">
+        <h3 class="text-lg font-semibold text-white">Model Comparison</h3>
+        <p class="text-sm text-slate-400">Side-by-side accuracy metrics for all models</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left border-b border-slate-700/50">
+                    <th class="pb-4 text-slate-400 font-medium">Model</th>
+                    <th class="pb-4 text-slate-400 font-medium">MAE</th>
+                    <th class="pb-4 text-slate-400 font-medium">RMSE</th>
+                    <th class="pb-4 text-slate-400 font-medium">R² Score</th>
+                    <th class="pb-4 text-slate-400 font-medium">MAPE (%)</th>
+                    <th class="pb-4 text-slate-400 font-medium">Status</th>
+                </tr>
+            </thead>
+            <tbody id="metricsTable">
+                <tr><td colspan="6" class="py-8 text-center text-slate-500">Loading forecast data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Insight Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-8">
+    <div class="glass rounded-2xl p-6 card-hover">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            </div>
+            <h4 class="font-semibold text-white">Forecast Insights</h4>
+        </div>
+        <div id="insightContent" class="text-sm text-slate-300 space-y-2">
+            <p class="text-slate-500">Run the forecast to see insights...</p>
+        </div>
+        <button id="saveForecastBtn" onclick="saveForecast()" class="mt-4 w-full px-4 py-2 bg-brand-600/30 text-brand-400 font-medium rounded-xl hover:bg-brand-600/50 transition-all text-sm border border-brand-500/20 hidden">
+            Save Forecast for Tracking
+        </button>
+    </div>
+    <div class="glass rounded-2xl p-6 card-hover">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            </div>
+            <h4 class="font-semibold text-white">Methodology</h4>
+        </div>
+        <div class="text-sm text-slate-300 space-y-2">
+            <p><span class="text-brand-400 font-medium">Linear Regression</span> — Fits a straight-line trend to the sales data. Best for stable, consistent growth patterns.</p>
+            <p><span class="text-emerald-400 font-medium">Polynomial Regression</span> — Captures non-linear trends with curved fitting. Handles accelerating or decelerating growth.</p>
+            <p><span class="text-amber-400 font-medium">Exponential Smoothing</span> — Holt-Winters method accounting for trend and seasonality. Best for data with recurring patterns.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Forecast Accuracy Tracking -->
+<div class="glass rounded-2xl p-4 sm:p-6 card-hover mt-8">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="text-lg font-semibold text-white">Forecast Accuracy History</h3>
+            <p class="text-sm text-slate-400">Compare past predictions against actual results</p>
+        </div>
+        <button onclick="loadAccuracy()" class="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-700/50 transition-all">
+            Refresh
+        </button>
+    </div>
+    <div id="accuracyContent" class="text-sm text-slate-500 text-center py-4">
+        Save a forecast to start tracking accuracy...
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let forecastChart = null;
+let forecastResult = null;
+
+function onCurrencyUpdated() {
+    if (forecastChart) forecastChart.destroy();
+    forecastResult = null;
+    runForecast();
+}
+
+const modelDisplayNames = {
+    'linear_regression': 'Linear Regression',
+    'polynomial_regression': 'Polynomial Regression',
+    'exponential_smoothing': 'Exponential Smoothing'
+};
+
+const modelColors = {
+    'linear_regression': { line: chartColors.primary, fill: chartColors.primaryLight },
+    'polynomial_regression': { line: chartColors.secondary, fill: chartColors.secondaryLight },
+    'exponential_smoothing': { line: chartColors.accent, fill: chartColors.accentLight }
+};
+
+async function runForecast() {
+    const months = document.getElementById('forecastMonths').value;
+
+    // Show loading state
+    document.getElementById('modelCards').innerHTML = `
+        <div class="glass rounded-2xl p-6 animate-pulse"><div class="h-4 bg-slate-700 rounded w-2/3 mb-4"></div><div class="h-8 bg-slate-700 rounded w-1/2"></div></div>
+        <div class="glass rounded-2xl p-6 animate-pulse"><div class="h-4 bg-slate-700 rounded w-2/3 mb-4"></div><div class="h-8 bg-slate-700 rounded w-1/2"></div></div>
+        <div class="glass rounded-2xl p-6 animate-pulse"><div class="h-4 bg-slate-700 rounded w-2/3 mb-4"></div><div class="h-8 bg-slate-700 rounded w-1/2"></div></div>
+    `;
+
+    try {
+        forecastResult = await fetchAPI(`forecast?months=${months}`);
+
+        if (!forecastResult || !forecastResult.models || Object.keys(forecastResult.models).length === 0) {
+            document.getElementById('modelCards').innerHTML = `
+                <div class="glass rounded-2xl p-6 col-span-full text-center">
+                    <p class="text-slate-400">Not enough data to generate forecasts. Please upload a dataset with at least 4 months of sales data.</p>
+                </div>`;
+            return;
+        }
+
+        renderModelCards();
+        renderForecastChart(forecastResult.best_model);
+        renderMetricsTable();
+        renderInsights();
+    } catch (err) {
+        console.error('Forecast error:', err);
+        document.getElementById('modelCards').innerHTML = `
+            <div class="glass rounded-2xl p-6 col-span-full text-center">
+                <p class="text-rose-400">Failed to load forecast. Please try again.</p>
+                <p class="text-xs text-slate-500 mt-2">${err.message || ''}</p>
+            </div>`;
+    }
+}
+
+function renderModelCards() {
+    const container = document.getElementById('modelCards');
+    let html = '';
+
+    const modelIcons = {
+        'linear_regression': `<svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>`,
+        'polynomial_regression': `<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`,
+        'exponential_smoothing': `<svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>`
+    };
+
+    for (const [name, data] of Object.entries(forecastResult.models)) {
+        const isBest = name === forecastResult.best_model;
+        const borderClass = isBest ? 'border-brand-500/40 ring-1 ring-brand-500/20' : '';
+        const forecast = data.forecast;
+        const avgForecast = forecast.reduce((a, b) => a + b, 0) / forecast.length;
+
+        html += `
+        <div class="glass rounded-2xl p-6 card-hover ${borderClass} relative overflow-hidden">
+            ${isBest ? '<div class="absolute top-3 right-3 px-2.5 py-1 text-xs font-semibold rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30">Best Model</div>' : ''}
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl ${isBest ? 'bg-brand-500/20' : 'bg-slate-700/50'} flex items-center justify-center flex-shrink-0">
+                    ${modelIcons[name] || ''}
+                </div>
+                <div class="min-w-0">
+                    <h4 class="font-semibold text-white text-sm">${modelDisplayNames[name]}</h4>
+                    <p class="text-xs text-slate-400">R² = ${data.metrics.r2.toFixed(4)}</p>
+                </div>
+            </div>
+            <p class="text-sm text-slate-400 mb-1">Avg Forecast Revenue</p>
+            <p class="text-xl font-bold text-white truncate">${formatCurrencyCompact(avgForecast)}</p>
+            <div class="mt-3 flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+                <span>MAE: ${formatCurrencyCompact(data.metrics.mae)}</span>
+                <span>MAPE: ${data.metrics.mape}%</span>
+            </div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderForecastChart(selectedModel) {
+    if (forecastChart) forecastChart.destroy();
+
+    const allDates = [...forecastResult.historical_dates, ...forecastResult.future_dates];
+    const labels = allDates.map(d => {
+        const date = new Date(d);
+        return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    });
+
+    const historicalData = forecastResult.historical_sales;
+    const datasets = [{
+        label: 'Historical Sales',
+        data: [...historicalData, ...new Array(forecastResult.future_dates.length).fill(null)],
+        borderColor: 'rgba(148, 163, 184, 0.8)',
+        backgroundColor: 'rgba(148, 163, 184, 0.1)',
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5
+    }];
+
+    // Add selected model forecast
+    const model = forecastResult.models[selectedModel];
+    if (model) {
+        const forecastLine = [...new Array(historicalData.length).fill(null)];
+        forecastLine[forecastLine.length - 1] = historicalData[historicalData.length - 1];
+        forecastLine.push(...model.forecast);
+
+        datasets.push({
+            label: modelDisplayNames[selectedModel] + ' (Forecast)',
+            data: forecastLine,
+            borderColor: modelColors[selectedModel].line,
+            backgroundColor: modelColors[selectedModel].fill,
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2.5,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            pointHoverRadius: 5
+        });
+
+        // Add fitted line
+        const fittedLine = [...model.fitted, ...new Array(forecastResult.future_dates.length).fill(null)];
+        datasets.push({
+            label: modelDisplayNames[selectedModel] + ' (Fitted)',
+            data: fittedLine,
+            borderColor: modelColors[selectedModel].line.replace('1)', '0.4)'),
+            borderWidth: 1.5,
+            borderDash: [3, 3],
+            pointRadius: 0,
+            fill: false,
+            tension: 0.4
+        });
+    }
+
+    // Model selector buttons
+    const selectorHtml = Object.keys(forecastResult.models).map(name => {
+        const isActive = name === selectedModel;
+        const activeClass = isActive ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'text-slate-400 hover:bg-slate-700/50';
+        return `<button onclick="renderForecastChart('${name}')" class="px-3 py-1.5 text-xs font-medium rounded-lg ${activeClass} transition-all">${modelDisplayNames[name]}</button>`;
+    }).join('');
+    document.getElementById('modelSelector').innerHTML = selectorHtml;
+
+    forecastChart = new Chart(document.getElementById('forecastChart'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            ...defaultChartOptions,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                ...defaultChartOptions.plugins,
+                tooltip: {
+                    ...defaultChartOptions.plugins.tooltip,
+                    callbacks: {
+                        label: ctx => ctx.parsed.y !== null ? ' ' + ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y) : null
+                    }
+                }
+            },
+            scales: {
+                ...defaultChartOptions.scales,
+                y: {
+                    ...defaultChartOptions.scales.y,
+                    ticks: { ...defaultChartOptions.scales.y.ticks, callback: v => formatCurrency(v) }
+                }
+            }
+        }
+    });
+}
+
+function renderMetricsTable() {
+    const tbody = document.getElementById('metricsTable');
+    let html = '';
+
+    for (const [name, data] of Object.entries(forecastResult.models)) {
+        const isBest = name === forecastResult.best_model;
+        const badgeColor = isBest ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/50 text-slate-400';
+        const badgeText = isBest ? 'Best Fit' : 'Active';
+        const rowClass = isBest ? 'bg-brand-500/5' : '';
+
+        html += `
+        <tr class="border-b border-slate-700/30 ${rowClass}">
+            <td class="py-4 font-medium text-white">${modelDisplayNames[name]}</td>
+            <td class="py-4 text-slate-300">${formatCurrency(data.metrics.mae)}</td>
+            <td class="py-4 text-slate-300">${formatCurrency(data.metrics.rmse)}</td>
+            <td class="py-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 rounded-full bg-slate-700">
+                        <div class="h-1.5 rounded-full ${data.metrics.r2 > 0.8 ? 'bg-emerald-400' : data.metrics.r2 > 0.5 ? 'bg-amber-400' : 'bg-rose-400'}" style="width: ${Math.max(0, data.metrics.r2 * 100)}%"></div>
+                    </div>
+                    <span class="text-slate-300">${data.metrics.r2.toFixed(4)}</span>
+                </div>
+            </td>
+            <td class="py-4 text-slate-300">${data.metrics.mape}%</td>
+            <td class="py-4"><span class="px-2.5 py-1 text-xs font-medium rounded-full ${badgeColor}">${badgeText}</span></td>
+        </tr>`;
+    }
+
+    tbody.innerHTML = html;
+}
+
+function renderInsights() {
+    const container = document.getElementById('insightContent');
+    const best = forecastResult.best_model;
+    const model = forecastResult.models[best];
+    const forecast = model.forecast;
+    const lastHistorical = forecastResult.historical_sales[forecastResult.historical_sales.length - 1];
+    const avgForecast = forecast.reduce((a, b) => a + b, 0) / forecast.length;
+    const maxForecast = Math.max(...forecast);
+    const minForecast = Math.min(...forecast);
+    const trend = forecast[forecast.length - 1] > forecast[0] ? 'upward' : 'downward';
+
+    container.innerHTML = `
+        <p>The <span class="text-brand-400 font-medium">${modelDisplayNames[best]}</span> model was selected as the best performer with an R² of <span class="text-white font-medium">${model.metrics.r2.toFixed(4)}</span>.</p>
+        <p>The forecast shows an <span class="${trend === 'upward' ? 'text-emerald-400' : 'text-rose-400'} font-medium">${trend} trend</span> with average monthly revenue of <span class="text-white font-medium">${formatCurrency(avgForecast)}</span>.</p>
+        <p>Forecasted range: <span class="text-white font-medium">${formatCurrency(minForecast)}</span> to <span class="text-white font-medium">${formatCurrency(maxForecast)}</span> per month.</p>
+        <p>Compared to the last recorded month (${formatCurrency(lastHistorical)}), the forecast average is <span class="${avgForecast > lastHistorical ? 'text-emerald-400' : 'text-rose-400'} font-medium">${((avgForecast - lastHistorical) / lastHistorical * 100).toFixed(1)}%</span> ${avgForecast > lastHistorical ? 'higher' : 'lower'}.</p>
+    `;
+
+    // Show save button
+    document.getElementById('saveForecastBtn').classList.remove('hidden');
+}
+
+// Auto-run on load
+runForecast();
+loadAccuracy();
+
+async function saveForecast() {
+    if (!forecastResult || !forecastResult.best_model) return;
+    const best = forecastResult.best_model;
+    const model = forecastResult.models[best];
+    try {
+        const res = await fetch('/api/forecast-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: best,
+                months: parseInt(document.getElementById('forecastMonths').value),
+                forecast_dates: forecastResult.future_dates,
+                forecast_values: model.forecast,
+                currency: currentCurrency,
+            })
+        });
+        const data = await res.json();
+        showToast(data.message || 'Forecast saved');
+        loadAccuracy();
+    } catch (e) {
+        showToast('Failed to save forecast', true);
+    }
+}
+
+async function loadAccuracy() {
+    try {
+        const res = await fetchAPI('forecast-accuracy');
+        const container = document.getElementById('accuracyContent');
+        if (!res.results || res.results.length === 0) {
+            container.innerHTML = '<p class="text-slate-500 py-4">No saved forecasts to compare yet. Save a forecast to start tracking accuracy.</p>';
+            return;
+        }
+        let html = '<div class="space-y-4">';
+        res.results.forEach(r => {
+            html += `
+            <div class="glass rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <span class="text-sm font-medium text-white">${modelDisplayNames[r.model] || r.model}</span>
+                        <span class="text-xs text-slate-500 ml-2">${new Date(r.saved_at).toLocaleDateString()}</span>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full ${r.avg_error < 10 ? 'bg-emerald-500/20 text-emerald-400' : r.avg_error < 25 ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}">
+                        Avg Error: ${r.avg_error}%
+                    </span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    ${r.comparisons.map(c => `
+                        <div class="bg-slate-800/40 rounded-lg p-2 text-xs">
+                            <p class="text-slate-400">${new Date(c.date).toLocaleDateString('en-US',{month:'short',year:'2-digit'})}</p>
+                            <p class="text-white">Predicted: ${formatCurrency(c.predicted)}</p>
+                            <p class="text-slate-300">Actual: ${formatCurrency(c.actual)}</p>
+                            <p class="${c.error_pct < 10 ? 'text-emerald-400' : 'text-rose-400'}">Error: ${c.error_pct}%</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (e) {}
+}
+</script>
+{% endblock %}

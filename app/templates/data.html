@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+{% block title %}Data{% endblock %}
+{% block page_title %}Data Management{% endblock %}
+{% block page_subtitle %}View, upload, and manage your sales dataset{% endblock %}
+
+{% block content %}
+<!-- Upload & Actions -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-8">
+    <div class="glass rounded-2xl p-4 sm:p-6 card-hover">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            </div>
+            <div>
+                <h3 class="font-semibold text-white">Upload Custom Data</h3>
+                <p class="text-xs text-slate-400">CSV file with date, sales, quantity columns</p>
+            </div>
+        </div>
+
+        <div id="dropZone" class="border-2 border-dashed border-slate-600/50 rounded-xl p-4 sm:p-8 text-center hover:border-brand-500/50 transition-all cursor-pointer mb-4"
+             ondragover="event.preventDefault(); this.classList.add('border-brand-500/50', 'bg-brand-500/5');"
+             ondragleave="this.classList.remove('border-brand-500/50', 'bg-brand-500/5');"
+             ondrop="handleDrop(event)"
+             onclick="document.getElementById('fileInput').click()">
+            <svg class="w-10 h-10 text-slate-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <p class="text-sm text-slate-400">Drag & drop your CSV file here, or <span class="text-brand-400">browse</span></p>
+            <p class="text-xs text-slate-500 mt-1">Required columns: date, sales, quantity</p>
+            <p class="text-xs text-slate-500">Optional: category, region, unit_price, currency</p>
+            <p class="text-xs text-slate-500 mt-1">Add a <span class="text-brand-400">currency</span> column (e.g. EUR, GBP, NGN) to specify your data's currency</p>
+        </div>
+        <input type="file" id="fileInput" accept=".csv" class="hidden" onchange="uploadFile(this.files[0])">
+
+        <div id="uploadStatus" class="hidden">
+            <div id="uploadMessage" class="text-sm p-3 rounded-lg"></div>
+        </div>
+    </div>
+
+    <div class="glass rounded-2xl p-4 sm:p-6 card-hover">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+                <h3 class="font-semibold text-white">Dataset Info</h3>
+                <p class="text-xs text-slate-400">Current dataset statistics</p>
+            </div>
+        </div>
+
+        <div id="datasetInfo" class="space-y-3">
+            <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                <span class="text-sm text-slate-400">Total Records</span>
+                <span id="totalRecords" class="text-sm font-medium text-white">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                <span class="text-sm text-slate-400">Total Pages</span>
+                <span id="totalPages" class="text-sm font-medium text-white">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                <span class="text-sm text-slate-400">Source Currency</span>
+                <span id="sourceCurrency" class="text-sm font-medium text-brand-400">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-slate-700/30">
+                <span class="text-sm text-slate-400">Columns</span>
+                <span id="dataColumns" class="text-sm font-medium text-white">--</span>
+            </div>
+        </div>
+
+        <div class="mt-6 flex flex-col sm:flex-row gap-3">
+            <button onclick="resetData()" class="flex-1 px-4 py-2.5 bg-slate-700/50 text-slate-300 font-medium rounded-xl hover:bg-slate-600/50 transition-all text-sm border border-slate-600/30">
+                Reset to Sample Data
+            </button>
+            <button onclick="downloadData()" class="flex-1 px-4 py-2.5 bg-brand-600/80 text-white font-medium rounded-xl hover:bg-brand-500 transition-all text-sm">
+                Download CSV
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="glass rounded-2xl p-4 sm:p-6 card-hover">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div>
+            <h3 class="text-lg font-semibold text-white">Data Preview</h3>
+            <p class="text-sm text-slate-400">Browse through your sales records</p>
+        </div>
+        <div class="flex items-center gap-3 self-end sm:self-auto">
+            <button onclick="changePage(-1)" id="prevBtn" class="px-3 py-2 bg-slate-700/50 text-slate-400 rounded-lg hover:bg-slate-600/50 transition-all text-sm disabled:opacity-40" disabled>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <span id="pageInfo" class="text-sm text-slate-400">Page 1</span>
+            <button onclick="changePage(1)" id="nextBtn" class="px-3 py-2 bg-slate-700/50 text-slate-400 rounded-lg hover:bg-slate-600/50 transition-all text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr id="tableHeader" class="text-left border-b border-slate-700/50">
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="6" class="py-8 text-center text-slate-500">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Data Format Guide -->
+<div class="glass rounded-2xl p-4 sm:p-6 mt-8 card-hover">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </div>
+        <h3 class="font-semibold text-white">CSV Format Guide</h3>
+    </div>
+    <div class="bg-slate-800/50 rounded-xl p-4 font-mono text-sm text-slate-300 overflow-x-auto">
+        <p class="text-slate-400 mb-2"># Required columns: date, sales, quantity</p>
+        <p class="text-slate-400 mb-2"># Optional columns: category, region, unit_price, currency</p>
+        <p class="text-slate-400 mb-3"># The 'currency' column tells the system what currency your sales values are in</p>
+        <p class="mb-1">date,category,region,quantity,unit_price,sales,currency</p>
+        <p class="mb-1">2024-01-15,Electronics,North America,2,299.99,623.18,USD</p>
+        <p class="mb-1">2024-01-15,Clothing,Europe,3,49.99,158.47,USD</p>
+        <p class="mb-1">2024-01-16,Home & Garden,Asia Pacific,1,199.99,215.39,USD</p>
+        <p class="mt-3 text-slate-400"># Example with different currencies:</p>
+        <p class="mb-1">2024-01-15,Electronics,Europe,2,275.00,573.65,EUR</p>
+        <p class="mb-1">2024-01-15,Clothing,West Africa,3,25000,78500,NGN</p>
+    </div>
+</div>
+
+<!-- Saved Datasets (Multi-dataset) -->
+<div class="glass rounded-2xl p-4 sm:p-6 mt-8 card-hover">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            </div>
+            <div>
+                <h3 class="font-semibold text-white">Saved Datasets</h3>
+                <p class="text-xs text-slate-400">Save, load, and compare multiple datasets</p>
+            </div>
+        </div>
+        <button onclick="saveCurrentDataset()" class="px-4 py-2 bg-brand-600/30 text-brand-400 font-medium rounded-xl hover:bg-brand-600/50 transition-all text-sm border border-brand-500/20">
+            Save Current
+        </button>
+    </div>
+    <div id="savedDatasets" class="space-y-2">
+        <p class="text-sm text-slate-500 text-center py-4">No saved datasets</p>
+    </div>
+</div>
+
+<!-- Upload Validation Modal -->
+<div id="uploadModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/60" onclick="closeUploadModal()"></div>
+    <div class="relative glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">Upload Preview</h3>
+            <button onclick="closeUploadModal()" class="text-slate-400 hover:text-white">&times;</button>
+        </div>
+        <div id="uploadPreviewContent">Loading...</div>
+        <div id="columnMappingSection" class="hidden mt-4 border-t border-slate-700/50 pt-4">
+            <h4 class="text-sm font-semibold text-white mb-3">Column Mapping</h4>
+            <p class="text-xs text-slate-400 mb-3">Map your columns to required fields. Leave as-is if columns match.</p>
+            <div id="columnMappingFields" class="space-y-2"></div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeUploadModal()" class="flex-1 px-4 py-2.5 bg-slate-700/50 text-slate-300 font-medium rounded-xl hover:bg-slate-600/50 transition-all text-sm">Cancel</button>
+            <button id="confirmUploadBtn" onclick="confirmUpload()" class="flex-1 px-4 py-2.5 bg-brand-600 text-white font-medium rounded-xl hover:bg-brand-500 transition-all text-sm disabled:opacity-50" disabled>Upload</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let totalPagesNum = 1;
+let pendingFile = null;
+let validationResult = null;
+
+function onCurrencyUpdated() {
+    loadDataPreview(currentPage);
+}
+
+async function loadSourceCurrency() {
+    try {
+        const res = await fetch('/api/currencies');
+        const data = await res.json();
+        document.getElementById('sourceCurrency').textContent = data.source_currency;
+    } catch (e) {}
+}
+
+async function loadDataPreview(page = 1) {
+    const result = await fetchAPI(`data-preview?page=${page}&per_page=50`);
+
+    document.getElementById('totalRecords').textContent = formatNumber(result.total);
+    document.getElementById('totalPages').textContent = result.total_pages;
+
+    if (result.data.length > 0) {
+        document.getElementById('dataColumns').textContent = Object.keys(result.data[0]).join(', ');
+    }
+
+    currentPage = result.page;
+    totalPagesNum = result.total_pages;
+
+    // Header
+    const header = document.getElementById('tableHeader');
+    if (result.data.length > 0) {
+        header.innerHTML = Object.keys(result.data[0]).map(col =>
+            `<th class="pb-4 text-slate-400 font-medium capitalize">${col.replace('_', ' ')}</th>`
+        ).join('');
+    }
+
+    // Body
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = result.data.map((row, i) => `
+        <tr class="border-b border-slate-700/20 hover:bg-slate-700/20 transition-colors">
+            ${Object.values(row).map(val => {
+                if (typeof val === 'number' && val > 100) {
+                    return `<td class="py-3 text-slate-300">${formatCurrency(val)}</td>`;
+                }
+                return `<td class="py-3 text-slate-300">${val}</td>`;
+            }).join('')}
+        </tr>
+    `).join('');
+
+    // Pagination
+    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPagesNum}`;
+    document.getElementById('prevBtn').disabled = currentPage <= 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPagesNum;
+}
+
+function changePage(delta) {
+    const newPage = currentPage + delta;
+    if (newPage >= 1 && newPage <= totalPagesNum) {
+        loadDataPreview(newPage);
+    }
+}
+
+async function uploadFile(file) {
+    if (!file) return;
+    pendingFile = file;
+
+    // Validate first
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch('/api/upload-validate', { method: 'POST', body: formData });
+        validationResult = await res.json();
+
+        if (res.ok) {
+            showUploadModal(validationResult);
+        } else {
+            const statusDiv = document.getElementById('uploadStatus');
+            const msgDiv = document.getElementById('uploadMessage');
+            statusDiv.classList.remove('hidden');
+            msgDiv.className = 'text-sm p-3 rounded-lg bg-rose-500/20 text-rose-400';
+            msgDiv.textContent = validationResult.error;
+        }
+    } catch (err) {
+        const statusDiv = document.getElementById('uploadStatus');
+        const msgDiv = document.getElementById('uploadMessage');
+        statusDiv.classList.remove('hidden');
+        msgDiv.className = 'text-sm p-3 rounded-lg bg-rose-500/20 text-rose-400';
+        msgDiv.textContent = 'Failed to validate file.';
+    }
+}
+
+function showUploadModal(data) {
+    const modal = document.getElementById('uploadModal');
+    modal.classList.remove('hidden');
+
+    const qualityColor = data.quality_score >= 80 ? 'text-emerald-400' : data.quality_score >= 50 ? 'text-amber-400' : 'text-rose-400';
+
+    let html = `
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="glass rounded-xl p-3">
+                <p class="text-xs text-slate-400">Rows</p>
+                <p class="text-lg font-bold text-white">${formatNumber(data.rows)}</p>
+            </div>
+            <div class="glass rounded-xl p-3">
+                <p class="text-xs text-slate-400">Quality Score</p>
+                <p class="text-lg font-bold ${qualityColor}">${data.quality_score}%</p>
+            </div>
+        </div>`;
+
+    if (data.date_range) {
+        html += `<p class="text-xs text-slate-400 mb-2">Date Range: <span class="text-white">${data.date_range.min} → ${data.date_range.max}</span></p>`;
+    }
+
+    if (data.sales_summary) {
+        html += `<p class="text-xs text-slate-400 mb-2">Sales: Min ${data.sales_summary.min} · Max ${data.sales_summary.max} · Avg ${data.sales_summary.mean}</p>`;
+    }
+
+    html += `<p class="text-xs text-slate-400 mb-2">Detected Currency: <span class="text-brand-400 font-medium">${data.detected_currency}</span></p>`;
+    html += `<p class="text-xs text-slate-400 mb-3">Columns: <span class="text-white">${data.columns.join(', ')}</span></p>`;
+
+    if (data.issues.length > 0) {
+        html += '<div class="mb-3"><p class="text-xs text-amber-400 font-medium mb-1">Issues Found:</p>';
+        data.issues.forEach(issue => {
+            html += `<p class="text-xs text-amber-300 ml-2">• ${issue}</p>`;
+        });
+        html += '</div>';
+    }
+
+    // Preview table
+    if (data.preview && data.preview.length > 0) {
+        html += '<div class="overflow-x-auto"><table class="w-full text-xs mt-2"><thead><tr class="border-b border-slate-700/50">';
+        Object.keys(data.preview[0]).forEach(col => {
+            html += `<th class="pb-2 text-slate-400 pr-3">${col}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+        data.preview.forEach(row => {
+            html += '<tr class="border-b border-slate-700/20">';
+            Object.values(row).forEach(val => {
+                html += `<td class="py-1.5 text-slate-300 pr-3">${val}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    document.getElementById('uploadPreviewContent').innerHTML = html;
+
+    // Column mapping if missing required columns
+    const required = ['date', 'sales', 'quantity'];
+    const missingRequired = required.filter(r => !data.columns.includes(r));
+    const mappingSection = document.getElementById('columnMappingSection');
+    const confirmBtn = document.getElementById('confirmUploadBtn');
+
+    if (missingRequired.length > 0) {
+        mappingSection.classList.remove('hidden');
+        let mappingHtml = '';
+        missingRequired.forEach(req => {
+            mappingHtml += `
+            <div class="flex items-center gap-3">
+                <label class="text-xs text-slate-400 w-20">${req}:</label>
+                <select id="map_${req}" class="flex-1 bg-slate-800/80 border border-slate-600/50 text-white rounded-lg px-3 py-1.5 text-xs">
+                    <option value="">-- Select column --</option>
+                    ${data.columns.map(c => `<option value="${c}">${c}</option>`).join('')}
+                </select>
+            </div>`;
+        });
+        document.getElementById('columnMappingFields').innerHTML = mappingHtml;
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Upload with Mapping';
+    } else {
+        mappingSection.classList.add('hidden');
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm Upload';
+    }
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.add('hidden');
+}
+
+async function confirmUpload() {
+    if (!pendingFile) return;
+
+    const required = ['date', 'sales', 'quantity'];
+    const missingRequired = validationResult ? required.filter(r => !validationResult.columns.includes(r)) : [];
+
+    const statusDiv = document.getElementById('uploadStatus');
+    const msgDiv = document.getElementById('uploadMessage');
+    closeUploadModal();
+    statusDiv.classList.remove('hidden');
+    msgDiv.className = 'text-sm p-3 rounded-lg bg-brand-500/20 text-brand-400';
+    msgDiv.textContent = 'Uploading...';
+
+    const formData = new FormData();
+    formData.append('file', pendingFile);
+
+    let url = '/api/upload';
+
+    if (missingRequired.length > 0) {
+        // Use mapped upload
+        const mapping = {};
+        missingRequired.forEach(req => {
+            const sel = document.getElementById(`map_${req}`);
+            if (sel && sel.value) mapping[req] = sel.value;
+        });
+        formData.append('mapping', JSON.stringify(mapping));
+        url = '/api/upload-mapped';
+    }
+
+    try {
+        const response = await fetch(url, { method: 'POST', body: formData });
+        const result = await response.json();
+
+        if (response.ok) {
+            msgDiv.className = 'text-sm p-3 rounded-lg bg-emerald-500/20 text-emerald-400';
+            msgDiv.textContent = `${result.message} (${formatNumber(result.rows)} rows, currency: ${result.source_currency || 'USD'})`;
+            loadDataPreview(1);
+            loadSourceCurrency();
+            initCurrencies();
+        } else {
+            msgDiv.className = 'text-sm p-3 rounded-lg bg-rose-500/20 text-rose-400';
+            msgDiv.textContent = result.error;
+        }
+    } catch (err) {
+        msgDiv.className = 'text-sm p-3 rounded-lg bg-rose-500/20 text-rose-400';
+        msgDiv.textContent = 'Upload failed. Please try again.';
+    }
+    pendingFile = null;
+}
+
+function handleDrop(event) {
+    event.preventDefault();
+    event.target.closest('#dropZone').classList.remove('border-brand-500/50', 'bg-brand-500/5');
+    const file = event.dataTransfer.files[0];
+    if (file) uploadFile(file);
+}
+
+async function resetData() {
+    if (!confirm('Reset to sample data? Your uploaded data will be replaced.')) return;
+
+    const response = await fetch('/api/reset', { method: 'POST' });
+    const result = await response.json();
+
+    const statusDiv = document.getElementById('uploadStatus');
+    const msgDiv = document.getElementById('uploadMessage');
+    statusDiv.classList.remove('hidden');
+    msgDiv.className = 'text-sm p-3 rounded-lg bg-emerald-500/20 text-emerald-400';
+    msgDiv.textContent = result.message;
+
+    loadDataPreview(1);
+}
+
+function downloadData() {
+    window.location.href = '/api/download-csv';
+}
+
+// ── Multi-dataset Management ─────────────────────────────
+async function saveCurrentDataset() {
+    const name = prompt('Enter a name for this dataset:');
+    if (!name || !name.trim()) return;
+
+    try {
+        const res = await fetch('/api/datasets/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim() })
+        });
+        const data = await res.json();
+        showToast(data.message || data.error);
+        loadSavedDatasets();
+    } catch (e) {
+        showToast('Failed to save dataset', true);
+    }
+}
+
+async function loadSavedDatasets() {
+    try {
+        const res = await fetch('/api/datasets');
+        const data = await res.json();
+        const container = document.getElementById('savedDatasets');
+
+        if (!data.datasets || data.datasets.length === 0) {
+            container.innerHTML = '<p class="text-sm text-slate-500 text-center py-4">No saved datasets yet. Save the current dataset to start.</p>';
+            return;
+        }
+
+        container.innerHTML = data.datasets.map(ds => `
+            <div class="flex items-center justify-between p-3 glass rounded-xl">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-white truncate">${ds.name}</p>
+                    <p class="text-xs text-slate-400">${formatNumber(ds.rows)} rows · ${ds.size_kb} KB · ${new Date(ds.modified).toLocaleDateString()}</p>
+                </div>
+                <div class="flex gap-2 flex-shrink-0 ml-3">
+                    <button onclick="loadDataset('${ds.name}')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-500/20 text-brand-400 hover:bg-brand-500/30 transition-all">Load</button>
+                    <button onclick="deleteDataset('${ds.name}')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {}
+}
+
+async function loadDataset(name) {
+    if (!confirm(`Load dataset "${name}"? This will replace the current active data.`)) return;
+    try {
+        const res = await fetch('/api/datasets/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        showToast(data.message || data.error);
+        loadDataPreview(1);
+        loadSourceCurrency();
+    } catch (e) {
+        showToast('Failed to load dataset', true);
+    }
+}
+
+async function deleteDataset(name) {
+    if (!confirm(`Delete saved dataset "${name}"?`)) return;
+    try {
+        const res = await fetch('/api/datasets/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        showToast(data.message);
+        loadSavedDatasets();
+    } catch (e) {
+        showToast('Failed to delete dataset', true);
+    }
+}
+
+loadDataPreview(1);
+loadSourceCurrency();
+loadSavedDatasets();
+</script>
+{% endblock %}

@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SalesCast{% endblock %} | Sales Forecasting Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe',
+                            300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6',
+                            600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af',
+                            900: '#1e3a8a', 950: '#172554'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Dark theme (default) */
+        .dark .gradient-bg { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }
+        .dark .glass { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        /* Light theme */
+        .light .gradient-bg { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%); }
+        .light .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); }
+        .light body, .light .text-slate-200 { color: #334155; }
+        .light .text-white { color: #0f172a; }
+        .light .text-slate-400 { color: #64748b; }
+        .light .text-slate-300 { color: #475569; }
+        .light .text-slate-500 { color: #94a3b8; }
+        .light .border-slate-700\\/50 { border-color: rgba(203, 213, 225, 0.5); }
+        .light .border-slate-700\\/30 { border-color: rgba(203, 213, 225, 0.3); }
+        .light .border-slate-700\\/20 { border-color: rgba(203, 213, 225, 0.2); }
+        .light .bg-slate-800\\/80 { background: rgba(241, 245, 249, 0.8); }
+        .light .bg-slate-800\\/50 { background: rgba(241, 245, 249, 0.5); }
+        .light .bg-slate-700\\/50 { background: rgba(226, 232, 240, 0.5); }
+        .light .bg-slate-700 { background: #e2e8f0; }
+        .light .hover\\:bg-slate-700\\/50:hover { background: rgba(226, 232, 240, 0.5); }
+        .light .hover\\:bg-slate-600\\/50:hover { background: rgba(203, 213, 225, 0.5); }
+        .light select, .light input[type=date] { color: #0f172a; background: rgba(241, 245, 249, 0.8); }
+        .light .border-slate-600\\/50 { border-color: rgba(203, 213, 225, 0.5); }
+        .light .border-slate-600\\/30 { border-color: rgba(203, 213, 225, 0.3); }
+        .light ::-webkit-scrollbar-track { background: #f1f5f9; }
+        .light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .stat-glow { box-shadow: 0 0 30px rgba(59, 130, 246, 0.1); }
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        /* Mobile sidebar */
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 25; }
+        .sidebar-overlay.active { display: block; }
+        @media (max-width: 1023px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body class="h-full gradient-bg text-slate-200 font-sans">
+    <div class="flex h-full">
+        <!-- Mobile overlay -->
+        <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-64 glass flex flex-col fixed h-full z-30 lg:translate-x-0">
+            <div class="p-6 border-b border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-white">SalesCast</h1>
+                        <p class="text-xs text-slate-400">Forecasting Engine</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-1">
+                <a href="/" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 {% if request.path == '/' %}bg-brand-600/20 text-brand-400 border border-brand-500/20{% else %}text-slate-400 hover:bg-slate-700/50 hover:text-white{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </a>
+                <a href="/forecast" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 {% if request.path == '/forecast' %}bg-brand-600/20 text-brand-400 border border-brand-500/20{% else %}text-slate-400 hover:bg-slate-700/50 hover:text-white{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Forecast
+                </a>
+                <a href="/analytics" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 {% if request.path == '/analytics' %}bg-brand-600/20 text-brand-400 border border-brand-500/20{% else %}text-slate-400 hover:bg-slate-700/50 hover:text-white{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Analytics
+                </a>
+                <a href="/data" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 {% if request.path == '/data' %}bg-brand-600/20 text-brand-400 border border-brand-500/20{% else %}text-slate-400 hover:bg-slate-700/50 hover:text-white{% endif %}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+                    Data
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-slate-700/50">
+                <div class="glass rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></div>
+                        <span class="text-xs text-slate-400">System Status</span>
+                    </div>
+                    <p class="text-xs text-emerald-400 font-medium">All models operational</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 lg:ml-64 overflow-y-auto">
+            <header class="sticky top-0 z-10 glass border-b border-slate-700/50 px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <!-- Mobile hamburger -->
+                        <button onclick="toggleSidebar()" class="lg:hidden flex-shrink-0 p-2 -ml-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        </button>
+                        <div class="min-w-0">
+                            <h2 class="text-lg sm:text-xl font-bold text-white truncate">{% block page_title %}Dashboard{% endblock %}</h2>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-0.5 truncate">{% block page_subtitle %}Overview of your sales performance{% endblock %}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0 flex-wrap justify-end">
+                        <!-- Date Range Filter -->
+                        <div class="hidden md:flex items-center gap-2">
+                            <input type="date" id="dateFrom" class="bg-slate-800/80 border border-slate-600/50 text-white rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-brand-500 outline-none" onchange="onDateFilterChange()">
+                            <span class="text-slate-500 text-xs">to</span>
+                            <input type="date" id="dateTo" class="bg-slate-800/80 border border-slate-600/50 text-white rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-brand-500 outline-none" onchange="onDateFilterChange()">
+                            <button onclick="clearDateFilter()" class="text-xs text-slate-400 hover:text-white px-1" title="Clear filter">✕</button>
+                        </div>
+                        <!-- Currency -->
+                        <div class="relative">
+                            <select id="currencySelector" onchange="onCurrencyChange(this.value)"
+                                class="bg-slate-800/80 border border-slate-600/50 text-white rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none appearance-none pr-7 cursor-pointer">
+                                <option value="USD">$ USD</option>
+                            </select>
+                        </div>
+                        <!-- Notifications Bell -->
+                        <div class="relative">
+                            <button onclick="toggleNotifications()" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors relative" title="Alerts">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                                <span id="alertBadge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">0</span>
+                            </button>
+                            <!-- Notifications Dropdown -->
+                            <div id="notificationsDropdown" class="hidden absolute right-0 top-full mt-2 w-80 sm:w-96 glass rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
+                                <div class="p-4 border-b border-slate-700/50">
+                                    <h4 class="font-semibold text-white text-sm">Anomaly Alerts</h4>
+                                </div>
+                                <div id="alertsList" class="p-2">
+                                    <p class="text-sm text-slate-500 p-3">Loading alerts...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Theme Toggle -->
+                        <button onclick="toggleTheme()" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors" title="Toggle theme" id="themeToggle">
+                            <svg id="themeIconDark" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            <svg id="themeIconLight" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                        </button>
+                        <!-- Export -->
+                        <div class="relative">
+                            <button onclick="toggleExportMenu()" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors" title="Export">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            </button>
+                            <div id="exportMenu" class="hidden absolute right-0 top-full mt-2 w-48 glass rounded-xl shadow-2xl z-50">
+                                <button onclick="exportAsPNG()" class="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 rounded-t-xl transition-colors">Export as PNG</button>
+                                <button onclick="exportAsPDF()" class="w-full text-left px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 rounded-b-xl transition-colors">Export as PDF</button>
+                            </div>
+                        </div>
+                        <!-- Share -->
+                        <button onclick="shareCurrentView()" class="hidden sm:block p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors" title="Share">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="p-4 sm:p-6 lg:p-8 fade-in">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ── Theme Management ──────────────────────────────────────
+        var currentTheme = localStorage.getItem('theme') || 'dark';
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            html.classList.remove('dark', 'light');
+            html.classList.add(theme);
+            currentTheme = theme;
+            localStorage.setItem('theme', theme);
+            document.getElementById('themeIconDark').classList.toggle('hidden', theme === 'light');
+            document.getElementById('themeIconLight').classList.toggle('hidden', theme === 'dark');
+        }
+        function toggleTheme() {
+            applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+        }
+        applyTheme(currentTheme);
+
+        // ── Date Range Filter ─────────────────────────────────────
+        var dateFilterFrom = '';
+        var dateFilterTo = '';
+
+        async function initDateRange() {
+            try {
+                const res = await fetch('/api/date-range');
+                const data = await res.json();
+                document.getElementById('dateFrom').min = data.min_date;
+                document.getElementById('dateFrom').max = data.max_date;
+                document.getElementById('dateTo').min = data.min_date;
+                document.getElementById('dateTo').max = data.max_date;
+                // Restore from URL if shared
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('date_from')) {
+                    document.getElementById('dateFrom').value = params.get('date_from');
+                    dateFilterFrom = params.get('date_from');
+                }
+                if (params.get('date_to')) {
+                    document.getElementById('dateTo').value = params.get('date_to');
+                    dateFilterTo = params.get('date_to');
+                }
+            } catch (e) {}
+        }
+
+        function onDateFilterChange() {
+            dateFilterFrom = document.getElementById('dateFrom').value;
+            dateFilterTo = document.getElementById('dateTo').value;
+            if (typeof onCurrencyUpdated === 'function') onCurrencyUpdated();
+        }
+
+        function clearDateFilter() {
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            dateFilterFrom = '';
+            dateFilterTo = '';
+            if (typeof onCurrencyUpdated === 'function') onCurrencyUpdated();
+        }
+
+        function getDateFilterParams() {
+            let params = '';
+            if (dateFilterFrom) params += `&date_from=${dateFilterFrom}`;
+            if (dateFilterTo) params += `&date_to=${dateFilterTo}`;
+            return params;
+        }
+
+        // ── Currency State ────────────────────────────────────────
+        var currentCurrency = localStorage.getItem('selectedCurrency') || 'USD';
+        var currencySymbol = '$';
+        var currencyList = [];
+        var sourceCurrency = 'USD';
+
+        async function initCurrencies() {
+            try {
+                const res = await fetch('/api/currencies');
+                const data = await res.json();
+                currencyList = data.currencies;
+                sourceCurrency = data.source_currency;
+
+                const select = document.getElementById('currencySelector');
+                select.innerHTML = currencyList.map(c =>
+                    `<option value="${c.code}" ${c.code === currentCurrency ? 'selected' : ''}>${c.symbol} ${c.code}</option>`
+                ).join('');
+
+                const cur = currencyList.find(c => c.code === currentCurrency);
+                if (cur) currencySymbol = cur.symbol;
+            } catch (e) {
+                console.error('Failed to load currencies', e);
+            }
+        }
+
+        function onCurrencyChange(code) {
+            currentCurrency = code;
+            const cur = currencyList.find(c => c.code === code);
+            if (cur) currencySymbol = cur.symbol;
+            localStorage.setItem('selectedCurrency', code);
+            // Trigger page-specific reload
+            if (typeof onCurrencyUpdated === 'function') onCurrencyUpdated();
+        }
+
+        function getCurrencyParam() {
+            return `currency=${currentCurrency}`;
+        }
+
+        function formatCurrency(value) {
+            // Use Intl for well-known currencies, fallback to symbol + number
+            try {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency', currency: currentCurrency,
+                    minimumFractionDigits: 0, maximumFractionDigits: 0
+                }).format(value);
+            } catch {
+                return currencySymbol + new Intl.NumberFormat('en-US', {
+                    minimumFractionDigits: 0, maximumFractionDigits: 0
+                }).format(value);
+            }
+        }
+
+        function formatCurrencyCompact(value) {
+            // Compact format for large numbers (e.g. ₦3.4M instead of ₦3,400,000)
+            try {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency', currency: currentCurrency,
+                    minimumFractionDigits: 0, maximumFractionDigits: 1,
+                    notation: 'compact', compactDisplay: 'short'
+                }).format(value);
+            } catch {
+                return currencySymbol + new Intl.NumberFormat('en-US', {
+                    minimumFractionDigits: 0, maximumFractionDigits: 1,
+                    notation: 'compact', compactDisplay: 'short'
+                }).format(value);
+            }
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat('en-US').format(value);
+        }
+
+        const chartColors = {
+            primary: 'rgba(59, 130, 246, 1)',
+            primaryLight: 'rgba(59, 130, 246, 0.15)',
+            secondary: 'rgba(16, 185, 129, 1)',
+            secondaryLight: 'rgba(16, 185, 129, 0.15)',
+            accent: 'rgba(245, 158, 11, 1)',
+            accentLight: 'rgba(245, 158, 11, 0.15)',
+            purple: 'rgba(139, 92, 246, 1)',
+            purpleLight: 'rgba(139, 92, 246, 0.15)',
+            rose: 'rgba(244, 63, 94, 1)',
+            roseLight: 'rgba(244, 63, 94, 0.15)',
+            get grid() { return currentTheme === 'light' ? 'rgba(100, 116, 139, 0.12)' : 'rgba(148, 163, 184, 0.08)'; },
+            get text() { return currentTheme === 'light' ? 'rgba(71, 85, 105, 0.9)' : 'rgba(148, 163, 184, 0.8)'; },
+        };
+
+        const defaultChartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: chartColors.text, font: { family: 'Inter', size: 12 }, padding: 20, usePointStyle: true, pointStyleWidth: 8 }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#fff',
+                    bodyColor: '#cbd5e1',
+                    borderColor: 'rgba(148, 163, 184, 0.2)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    titleFont: { family: 'Inter', weight: '600' },
+                    bodyFont: { family: 'Inter' }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: chartColors.grid },
+                    ticks: { color: chartColors.text, font: { family: 'Inter', size: 11 } }
+                },
+                y: {
+                    grid: { color: chartColors.grid },
+                    ticks: { color: chartColors.text, font: { family: 'Inter', size: 11 } }
+                }
+            }
+        };
+
+        async function fetchAPI(endpoint) {
+            const sep = endpoint.includes('?') ? '&' : '?';
+            const response = await fetch(`/api/${endpoint}${sep}${getCurrencyParam()}${getDateFilterParams()}`);
+            return response.json();
+        }
+
+        function showLoading(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) {
+                el.innerHTML = '<div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>';
+            }
+        }
+
+        // ── Notifications / Anomaly Alerts ────────────────────────
+        var alertsData = [];
+
+        async function loadAlerts() {
+            try {
+                const res = await fetchAPI('anomalies');
+                alertsData = res.alerts || [];
+                const badge = document.getElementById('alertBadge');
+                if (alertsData.length > 0) {
+                    badge.textContent = alertsData.length > 9 ? '9+' : alertsData.length;
+                    badge.classList.remove('hidden');
+                    badge.classList.add('flex');
+                } else {
+                    badge.classList.add('hidden');
+                }
+                renderAlerts();
+            } catch (e) {}
+        }
+
+        function renderAlerts() {
+            const container = document.getElementById('alertsList');
+            if (alertsData.length === 0) {
+                container.innerHTML = '<p class="text-sm text-slate-500 p-3 text-center">No anomalies detected</p>';
+                return;
+            }
+            container.innerHTML = alertsData.slice(0, 10).map(a => {
+                const icon = a.severity === 'danger'
+                    ? '<svg class="w-4 h-4 text-rose-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>'
+                    : a.severity === 'warning'
+                    ? '<svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>'
+                    : '<svg class="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                return `<div class="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-700/30 transition-colors">
+                    ${icon}
+                    <div class="min-w-0">
+                        <p class="text-sm text-slate-300">${a.message}</p>
+                        <p class="text-xs text-slate-500 mt-1">${new Date(a.date).toLocaleDateString('en-US', {month:'short',year:'numeric'})}</p>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            dropdown.classList.toggle('hidden');
+            // Close export menu if open
+            document.getElementById('exportMenu').classList.add('hidden');
+        }
+
+        // ── Export Functions ──────────────────────────────────────
+        function toggleExportMenu() {
+            const menu = document.getElementById('exportMenu');
+            menu.classList.toggle('hidden');
+            document.getElementById('notificationsDropdown').classList.add('hidden');
+        }
+
+        async function exportAsPNG() {
+            document.getElementById('exportMenu').classList.add('hidden');
+            const content = document.querySelector('main');
+            try {
+                const canvas = await html2canvas(content, {
+                    backgroundColor: currentTheme === 'dark' ? '#0f172a' : '#f8fafc',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+                const link = document.createElement('a');
+                link.download = `salescast-${document.title.split('|')[0].trim().toLowerCase()}-${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                console.error('Export failed:', e);
+                alert('Export failed. Please try again.');
+            }
+        }
+
+        async function exportAsPDF() {
+            document.getElementById('exportMenu').classList.add('hidden');
+            const content = document.querySelector('main');
+            try {
+                const canvas = await html2canvas(content, {
+                    backgroundColor: currentTheme === 'dark' ? '#0f172a' : '#f8fafc',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+                const { jsPDF } = window.jspdf;
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = canvas.width;
+                const imgHeight = canvas.height;
+                const pdfWidth = 297; // A4 landscape width in mm
+                const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+                const pdf = new jsPDF({ orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape', unit: 'mm', format: 'a4' });
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+                const w = imgWidth * ratio;
+                const h = imgHeight * ratio;
+                pdf.addImage(imgData, 'PNG', (pageWidth - w) / 2, 0, w, h);
+                pdf.save(`salescast-${document.title.split('|')[0].trim().toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`);
+            } catch (e) {
+                console.error('PDF export failed:', e);
+                alert('PDF export failed. Please try again.');
+            }
+        }
+
+        // ── Share Functions ──────────────────────────────────────
+        async function shareCurrentView() {
+            try {
+                const res = await fetch('/api/share-state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currency: currentCurrency,
+                        date_from: dateFilterFrom,
+                        date_to: dateFilterTo,
+                        page: window.location.pathname,
+                    })
+                });
+                const data = await res.json();
+                const url = `${window.location.origin}${window.location.pathname}?state=${data.token}`;
+                await navigator.clipboard.writeText(url);
+                showToast('Link copied to clipboard!');
+            } catch (e) {
+                showToast('Failed to generate share link', true);
+            }
+        }
+
+        function loadSharedState() {
+            const params = new URLSearchParams(window.location.search);
+            const stateToken = params.get('state');
+            if (stateToken) {
+                try {
+                    const decoded = JSON.parse(atob(stateToken.replace(/-/g,'+').replace(/_/g,'/')));
+                    if (decoded.currency) {
+                        currentCurrency = decoded.currency;
+                        localStorage.setItem('selectedCurrency', decoded.currency);
+                    }
+                    if (decoded.date_from) {
+                        dateFilterFrom = decoded.date_from;
+                        document.getElementById('dateFrom').value = decoded.date_from;
+                    }
+                    if (decoded.date_to) {
+                        dateFilterTo = decoded.date_to;
+                        document.getElementById('dateTo').value = decoded.date_to;
+                    }
+                } catch (e) {}
+            }
+        }
+
+        // ── Toast Notifications ──────────────────────────────────
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all duration-300 transform translate-y-2 opacity-0 ${isError ? 'bg-rose-500/90 text-white' : 'bg-emerald-500/90 text-white'}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; });
+            setTimeout(() => {
+                toast.style.transform = 'translateY(10px)';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Close dropdowns on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#notificationsDropdown') && !e.target.closest('[onclick*="toggleNotifications"]')) {
+                document.getElementById('notificationsDropdown').classList.add('hidden');
+            }
+            if (!e.target.closest('#exportMenu') && !e.target.closest('[onclick*="toggleExportMenu"]')) {
+                document.getElementById('exportMenu').classList.add('hidden');
+            }
+        });
+
+        // Initialize
+        initCurrencies();
+        initDateRange();
+        loadSharedState();
+        loadAlerts();
+
+        // ── Mobile sidebar toggle ─────────────────────────────────
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('active');
+        }
+        // Close sidebar on nav link click (mobile)
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 1024) toggleSidebar();
+            });
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
